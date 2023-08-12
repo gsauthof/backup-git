@@ -73,10 +73,11 @@ def backup_gh_starred(user):
     for r in g.get_user(user).get_starred():
         if r.owner.login == user:
             continue
+        url = r.clone_url
         try:
-            backup(r.clone_url)
+            backup(url)
         except Exception as e:
-            log.error(f'Failed to mirror {line}: {e}')
+            log.error(f'Failed to mirror {url}: {e}')
             x = 1
     return x
 
@@ -86,10 +87,11 @@ def backup_gl_starred(user):
     u = gl.users.list(username=user)[0]
     x = 0
     for r in u.starred_projects.list(all=True, as_list=False):
+        url = r.http_url_to_repo
         try:
-            backup(r.http_url_to_repo)
+            backup(url)
         except Exception as e:
-            log.error(f'Failed to mirror {line}: {e}')
+            log.error(f'Failed to mirror {url}: {e}')
             x = 1
     return x
 
