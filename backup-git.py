@@ -7,6 +7,7 @@
 
 import configargparse
 import github
+import gitlab
 import logging
 import os
 import subprocess
@@ -24,6 +25,7 @@ def parse_args():
     p.add('-c', '--config', is_config_file=True, help='config file')
     p.add('--list', metavar='FILE.LST', help='List of repository urls')
     p.add('--gh-starred', metavar='USER', help='Backup all starred github repositories')
+    p.add('--gl-starred', metavar='USER', help='Backup all starred gitlab repositories')
     args = p.parse_args()
     return args
 
@@ -78,6 +80,19 @@ def backup_gh_starred(user):
             x = 1
     return x
 
+def backup_gl_starred(user):
+    log.info(f'Backing up gitlab repositories starred by {user} ...')
+    gl = gitlab.Gitlab()
+    u = gl.users.list(username=user)[0]
+    x = 0
+    for r in u.starred_projects.list(all=True, as_list=False):
+        try:
+            backup(r.http_url_to_repo)
+        except Exception as e:
+            log.error(f'Failed to mirror {line}: {e}')
+            x = 1
+    return x
+
 def main():
     log_format      = '%(asctime)s - %(levelname)-8s - %(message)s'
     log_date_format = '%Y-%m-%d %H:%M:%S'
@@ -89,6 +104,8 @@ def main():
         r = max(r, backup_list(args.list))
     if args.gh_starred:
         r = max(r, backup_gh_starred(args.gh_starred))
+    if args.gl_starred:
+        r = max(r, backup_gl_starred(args.gl_starred))
 
     log.info('done')
     return r
