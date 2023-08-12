@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import configargparse
+import github
 import logging
 import os
 import subprocess
@@ -21,16 +22,20 @@ def parse_args():
             default_config_files=[f'{prefix}/lib/{prog}/config.ini',
                 f'/etc/{prog}.ini', f'~/.config/{prog}.ini'])
     p.add('-c', '--config', is_config_file=True, help='config file')
-    p.add('list', nargs=1, metavar='FILE.LST', help='List of repository urls')
+    p.add('--list', metavar='FILE.LST', help='List of repository urls')
+    p.add('--gh-starred', metavar='USER', help='Backup all starred github repositories')
     args = p.parse_args()
-    args.list = args.list[0]
     return args
 
 
-def backup(url):
+def url2dir(url):
     base = url[url.rindex('/')+1:]
     if not base.endswith('.git'):
         base += '.git'
+    return base
+
+def backup(url):
+    base = url2dir(url)
     log.info(f'Backing up {url} to {base} ...')
     if os.path.exists(base):
         log.info(f'Refreshing {base} ...')
@@ -42,15 +47,10 @@ def backup(url):
         log.info(f'Cloning {url} ...')
         subprocess.run(['git', 'clone', '--mirror', url, base], check=True)
 
-
-def main():
-    log_format      = '%(asctime)s - %(levelname)-8s - %(message)s'
-    log_date_format = '%Y-%m-%d %H:%M:%S'
-    logging.basicConfig(format=log_format, datefmt=log_date_format,
-                        level=logging.INFO)
-    args = parse_args()
+def backup_list(lst):
+    log.info(f'Backing up repositories listed in {lst} ...')
     r = 0
-    for line in open(args.list):
+    for line in open(lst):
         i = line.find('#')
         if i != -1:
             line = line[:i]
@@ -62,6 +62,34 @@ def main():
         except Exception as e:
             log.error(f'Failed to mirror {line}: {e}')
             r = 1
+    return r
+
+def backup_gh_starred(user):
+    log.info(f'Backing up github repositories starred by {user} ...')
+    g = github.Github()
+    x = 0
+    for r in g.get_user(user).get_starred():
+        if r.owner.login == user:
+            continue
+        try:
+            backup(r.clone_url)
+        except Exception as e:
+            log.error(f'Failed to mirror {line}: {e}')
+            x = 1
+    return x
+
+def main():
+    log_format      = '%(asctime)s - %(levelname)-8s - %(message)s'
+    log_date_format = '%Y-%m-%d %H:%M:%S'
+    logging.basicConfig(format=log_format, datefmt=log_date_format,
+                        level=logging.INFO)
+    args = parse_args()
+    r = 0
+    if args.list:
+        r = max(r, backup_list(args.list))
+    if args.gh_starred:
+        r = max(r, backup_gh_starred(args.gh_starred))
+
     log.info('done')
     return r
 
