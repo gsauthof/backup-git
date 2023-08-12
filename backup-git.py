@@ -10,6 +10,7 @@ import github
 import gitlab
 import logging
 import os
+import pathlib
 import subprocess
 import sys
 
@@ -31,10 +32,22 @@ def parse_args():
 
 
 def url2dir(url):
-    base = url[url.rindex('/')+1:]
-    if not base.endswith('.git'):
-        base += '.git'
-    return base
+    url = url.strip()
+    if not url:
+        raise RuntimeError('Passed empty URL')
+    s = url[url.index('//')+2:]
+    if not s:
+        raise RuntimeError('Passed empty URL RHS')
+    xs = s.split('/')
+    if any(not x for x in xs):
+        raise RuntimeError(f'URL contains empty component: {url}')
+    if any(x == '.' for x in xs):
+        raise RuntimeError(f'URL contains . component: {url}')
+    if any(x == '..' for x in xs):
+        raise RuntimeError(f'URL contains .. component: {url}')
+    if not xs[-1].endswith('.git'):
+        xs[-1] += '.git'
+    return pathlib.Path('/'.join(xs))
 
 def backup(url):
     base = url2dir(url)
@@ -47,7 +60,8 @@ def backup(url):
         os.chdir(t)
     else:
         log.info(f'Cloning {url} ...')
-        subprocess.run(['git', 'clone', '--mirror', url, base], check=True)
+        os.makedirs(base.parent, exist_ok=True)
+        subprocess.run(['git', 'clone', '--mirror', url, str(base)], check=True)
 
 def backup_list(lst):
     log.info(f'Backing up repositories listed in {lst} ...')
