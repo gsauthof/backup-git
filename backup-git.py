@@ -54,10 +54,7 @@ def backup(url):
     log.info(f'Backing up {url} to {base} ...')
     if os.path.exists(base):
         log.info(f'Refreshing {base} ...')
-        t = os.getcwd()
-        os.chdir(base)
-        subprocess.run(['git', 'remote', 'update'], check=True)
-        os.chdir(t)
+        subprocess.run(['git', 'remote', 'update'], cwd=base, check=True)
     else:
         log.info(f'Cloning {url} ...')
         os.makedirs(base.parent, exist_ok=True)
